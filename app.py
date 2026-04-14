@@ -3,7 +3,6 @@ import pandas as pd
 import os
 import io
 from datetime import datetime
-import glob
 
 st.set_page_config(
     page_title="Diagnóstico Centros Educativos",
@@ -11,80 +10,114 @@ st.set_page_config(
     layout="wide"
 )
 
-# ── Estilos ────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
 [data-testid="stSidebar"] { min-width: 320px; }
-.metric-box { background:#f8f9fa; border-radius:10px; padding:16px 20px; text-align:center; border:1px solid #e0e0e0; }
+
+.metric-box {
+    background:#f8f9fa;
+    border-radius:10px;
+    padding:16px 20px;
+    text-align:center;
+    border:1px solid #e0e0e0;
+}
 .metric-label { font-size:13px; color:#666; margin-bottom:4px; }
-.metric-val { font-size:30px; font-weight:700; }
-.blue { color:#185FA5; } .green { color:#2d6a1f; } .amber { color:#7a4f00; } .red { color:#8b1a1a; }
-.badge-c { background:#d4edda; color:#155724; padding:3px 10px; border-radius:12px; font-size:12px; font-weight:600; }
-.badge-i { background:#fff3cd; color:#856404; padding:3px 10px; border-radius:12px; font-size:12px; font-weight:600; }
-.badge-n { background:#f8d7da; color:#721c24; padding:3px 10px; border-radius:12px; font-size:12px; font-weight:600; }
-.update-box { background:#e8f4fd; border-left:4px solid #185FA5; padding:10px 16px; border-radius:6px; margin-bottom:20px; font-size:13px; }
-table { width:100%; }
+.metric-val   { font-size:30px; font-weight:700; }
+.blue  { color:#185FA5; }
+.green { color:#2d6a1f; }
+.amber { color:#7a4f00; }
+.red   { color:#8b1a1a; }
+
+.sync-banner {
+    background:#e8f4fd;
+    border:1px solid #b3d9f5;
+    border-left:5px solid #185FA5;
+    padding:16px 20px;
+    border-radius:8px;
+    margin-bottom:8px;
+    font-size:14px;
+    color:#1a3a5c;
+}
+.sync-banner .title { font-size:16px; font-weight:700; margin-bottom:6px; }
+.sync-banner .note  { font-size:12px; color:#444; margin-top:6px; line-height:1.6; }
+.sync-banner .files { font-size:12px; color:#185FA5; margin-top:4px; }
+
+.no-sync-banner {
+    background:#fff8e1;
+    border:1px solid #ffe082;
+    border-left:5px solid #f9a825;
+    padding:14px 20px;
+    border-radius:8px;
+    margin-bottom:16px;
+    font-size:14px;
+    color:#4e3c00;
+}
+
+.download-area {
+    background:#f0faf4;
+    border:1px solid #a8d5b5;
+    border-left:5px solid #2d6a1f;
+    padding:16px 20px;
+    border-radius:8px;
+    margin-top:20px;
+    margin-bottom:10px;
+}
+.download-title { font-size:15px; font-weight:700; color:#2d6a1f; margin-bottom:4px; }
+.download-note  { font-size:12px; color:#555; margin-bottom:12px; }
 </style>
 """, unsafe_allow_html=True)
 
-# ── Configuración de instrumentos ─────────────────────────────────────────────
+# ── Configuración ──────────────────────────────────────────────────────────────
 DATA_DIR = "data"
 os.makedirs(DATA_DIR, exist_ok=True)
 
 INSTRUMENTS = {
-    "Ficha CE":             ("Código SIACE del colegio",                                          True),
-    "Entrevista":           ("Código SIACE del colegio",                                          False),
-    "Clima Capacitación":   ("Preguntas de localización/Selecciona el código del colegio",        False),
-    "Clima Docentes":       ("Selecciona el código del colegio",                                  False),
-    "Clima Estudiantes":    ("Selecciona el código del colegio",                                  False),
-    "Clima Líderes":        ("Selecciona el código del colegio",                                  False),
-    "Línea Base Comunidad": ("Selecciona el código del colegio",                                  False),
-    "Línea Base Directivo": ("Selecciona el código del colegio",                                  False),
-    "Línea Base Docente":   ("Selecciona el código del colegio",                                  False),
-    "Lista Chequeo":        ("Selecciona el código del colegio",                                  False),
+    "Ficha CE":          ("Código SIACE del colegio",         True),
+    "Entrevista":        ("Código SIACE del colegio",         False),
+    "Clima Docentes":    ("Selecciona el código del colegio", False),
+    "Clima Estudiantes": ("Selecciona el código del colegio", False),
+    "Clima Líderes":     ("Selecciona el código del colegio", False),
+    "Lista Chequeo":     ("Selecciona el código del colegio", False),
 }
 
 FILE_KEYS = {
-    "pulldata":              "PullData.csv",
-    "Ficha CE":              "Ficha_CE.csv",
-    "Entrevista":            "Entrevista.csv",
-    "Clima Capacitación":    "Clima_Capacitacion.csv",
-    "Clima Docentes":        "Clima_Docentes.csv",
-    "Clima Estudiantes":     "Clima_Estudiantes.csv",
-    "Clima Líderes":         "Clima_Lideres.csv",
-    "Línea Base Comunidad":  "Linea_Base_Comunidad.csv",
-    "Línea Base Directivo":  "Linea_Base_Directivo.csv",
-    "Línea Base Docente":    "Linea_Base_Docente.csv",
-    "Lista Chequeo":         "Lista_Chequeo.csv",
+    "pulldata":          "PullData.csv",
+    "Ficha CE":          "Ficha_CE.csv",
+    "Entrevista":        "Entrevista.csv",
+    "Clima Docentes":    "Clima_Docentes.csv",
+    "Clima Estudiantes": "Clima_Estudiantes.csv",
+    "Clima Líderes":     "Clima_Lideres.csv",
+    "Lista Chequeo":     "Lista_Chequeo.csv",
 }
 
 UPLOAD_LABELS = {
-    "pulldata":              "📋 PullData (lista de colegios)",
-    "Ficha CE":              "1. Ficha de información CE",
-    "Entrevista":            "2. Entrevista semiestructurada",
-    "Clima Capacitación":    "3. Clima escolar – Capacitación",
-    "Clima Docentes":        "4. Clima escolar – Docentes",
-    "Clima Estudiantes":     "5. Clima escolar – Estudiantes",
-    "Clima Líderes":         "6. Clima escolar – Líderes",
-    "Línea Base Comunidad":  "7. Línea base – Comunidad",
-    "Línea Base Directivo":  "8. Línea base – Directivo",
-    "Línea Base Docente":    "9. Línea base – Docente",
-    "Lista Chequeo":         "10. Lista de chequeo físico",
+    "pulldata":          "📋 PullData (lista de colegios)",
+    "Ficha CE":          "1. Ficha de información CE",
+    "Entrevista":        "2. Entrevista semiestructurada",
+    "Clima Docentes":    "3. Clima escolar – Docentes",
+    "Clima Estudiantes": "4. Clima escolar – Estudiantes",
+    "Clima Líderes":     "5. Clima escolar – Líderes",
+    "Lista Chequeo":     "6. Lista de chequeo físico",
 }
 
-META_FILE = os.path.join(DATA_DIR, "ultima_actualizacion.txt")
+META_FILE = os.path.join(DATA_DIR, "ultima_sincronizacion.txt")
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
-def save_upload_time():
+def save_sync_time(archivos_subidos):
     now = datetime.now().strftime("%d/%m/%Y a las %H:%M")
-    with open(META_FILE, "w") as f:
-        f.write(now)
+    nombres = ", ".join(archivos_subidos)
+    with open(META_FILE, "w", encoding="utf-8") as f:
+        f.write(f"{now}|{nombres}")
 
-def get_last_update():
+def get_last_sync():
     if os.path.exists(META_FILE):
-        with open(META_FILE) as f:
-            return f.read().strip()
-    return None
+        with open(META_FILE, encoding="utf-8") as f:
+            contenido = f.read().strip()
+        if "|" in contenido:
+            fecha, archivos = contenido.split("|", 1)
+            return fecha.strip(), archivos.strip()
+        return contenido, ""
+    return None, None
 
 def read_csv_robust(path_or_bytes):
     for sep in [';', ',', '\t']:
@@ -109,23 +142,21 @@ def safe_to_int(val):
 def files_on_disk():
     return {k: os.path.exists(os.path.join(DATA_DIR, v)) for k, v in FILE_KEYS.items()}
 
-def count_files_on_disk():
+def count_instruments_on_disk():
     status = files_on_disk()
     return sum(1 for k, v in status.items() if v and k != "pulldata")
 
-# ── Sidebar: carga de archivos ─────────────────────────────────────────────────
+# ── Sidebar ────────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.title("📂 Actualizar archivos")
     st.markdown("Sube los CSV exportados desde KoboToolbox. Los archivos se guardan y el reporte se actualiza automáticamente.")
 
     uploaded_files = {}
-    all_keys = ["pulldata"] + list(INSTRUMENTS.keys())
-    for key in all_keys:
-        label = UPLOAD_LABELS[key]
+    for key in ["pulldata"] + list(INSTRUMENTS.keys()):
         exists = os.path.exists(os.path.join(DATA_DIR, FILE_KEYS[key]))
         indicator = "✅" if exists else "⬜"
         uploaded_files[key] = st.file_uploader(
-            f"{indicator} {label}",
+            f"{indicator} {UPLOAD_LABELS[key]}",
             type="csv",
             key=f"upload_{key}"
         )
@@ -139,7 +170,7 @@ with st.sidebar:
                     f.write(file.getvalue())
                 saved.append(UPLOAD_LABELS[key])
         if saved:
-            save_upload_time()
+            save_sync_time(saved)
             st.success(f"✅ {len(saved)} archivo(s) guardados.")
             st.rerun()
         else:
@@ -147,24 +178,29 @@ with st.sidebar:
 
     st.markdown("---")
     on_disk = files_on_disk()
-    loaded_count = sum(1 for k, v in on_disk.items() if v and k != "pulldata")
-    st.markdown(f"**Instrumentos disponibles: {loaded_count}/10**")
-    st.progress(loaded_count / 10)
+    loaded = count_instruments_on_disk()
+    st.markdown(f"**Instrumentos disponibles: {loaded}/6**")
+    st.progress(loaded / 6)
     for key in list(INSTRUMENTS.keys()):
         icon = "✅" if on_disk.get(key) else "❌"
         st.markdown(f"{icon} {UPLOAD_LABELS[key]}")
 
-# ── Verificar que haya datos ───────────────────────────────────────────────────
+    # Fecha en sidebar también
+    last_fecha, _ = get_last_sync()
+    if last_fecha:
+        st.markdown("---")
+        st.caption(f"🕐 Última sincronización:\n**{last_fecha}**")
+
+# ── Verificar PullData ─────────────────────────────────────────────────────────
 pulldata_path = os.path.join(DATA_DIR, FILE_KEYS["pulldata"])
 if not os.path.exists(pulldata_path):
     st.title("🏫 Diagnóstico de Centros Educativos")
-    st.info("👈 Para comenzar, sube el archivo **PullData.csv** y los instrumentos en el panel izquierdo, luego haz clic en **Guardar y actualizar reporte**.")
+    st.info("👈 Para comenzar, sube el **PullData.csv** y los instrumentos en el panel izquierdo, luego haz clic en **Guardar y actualizar reporte**.")
     st.stop()
 
-# ── Cargar PullData ────────────────────────────────────────────────────────────
 pulldata = read_csv_robust(pulldata_path)
 if pulldata is None or 'codigo' not in pulldata.columns:
-    st.error("No se pudo leer el PullData. Verifica que sea el archivo correcto.")
+    st.error("No se pudo leer el PullData. Verifica el archivo.")
     st.stop()
 
 pulldata['codigo'] = pulldata['codigo'].astype(str)
@@ -199,7 +235,7 @@ for instr_name, (code_col, use_name_map) in INSTRUMENTS.items():
             result[str(code)] = {'count': len(grp), 'fecha': fecha}
     instrument_data[instr_name] = result
 
-# Director info from Entrevista
+# ── Director desde Entrevista ──────────────────────────────────────────────────
 ent_path = os.path.join(DATA_DIR, FILE_KEYS["Entrevista"])
 ent_info = {}
 if os.path.exists(ent_path):
@@ -222,16 +258,16 @@ if os.path.exists(ent_path):
                     'correo':   cl(row.get('Correo electrónico del entrevistado/a:', '')),
                 }
 
-# ── Construir tabla de resultados ──────────────────────────────────────────────
-instr_names = list(INSTRUMENTS.keys())
+# ── Construir tabla ────────────────────────────────────────────────────────────
+instr_names  = list(INSTRUMENTS.keys())
+total_instr  = len(instr_names)
 rows = []
 for _, school in pulldata.iterrows():
     code = str(school['codigo'])
-    ei = ent_info.get(code, {})
-
+    ei   = ent_info.get(code, {})
     instr_status = {}
-    missing = []
-    fecha_diag = None
+    missing      = []
+    fecha_diag   = None
 
     for iname in instr_names:
         data = instrument_data[iname].get(code)
@@ -244,7 +280,7 @@ for _, school in pulldata.iterrows():
             missing.append(iname)
 
     total_done = sum(1 for i in instr_names if instr_status[i] > 0)
-    if total_done == len(instr_names):
+    if total_done == total_instr:
         estado = 'Diagnóstico completo'
     elif total_done == 0:
         estado = 'Sin realizar'
@@ -252,16 +288,16 @@ for _, school in pulldata.iterrows():
         estado = 'Diagnóstico incompleto'
 
     row = {
-        'SIACE':                  code,
-        'Nombre CE':              school['nombre'],
-        'Regional/Provincia':     school['provincia'],
-        'Director/a':             ei.get('director', ''),
-        'Teléfono':               ei.get('contacto', ''),
-        'Correo':                 ei.get('correo', ''),
-        'Fecha último registro':  fecha_diag or '',
-        'Estado':                 estado,
-        'Completados':            total_done,
-        'Falta':                  '; '.join(missing) if missing else '',
+        'SIACE':                 code,
+        'Nombre CE':             school['nombre'],
+        'Regional/Provincia':    school['provincia'],
+        'Director/a':            ei.get('director', ''),
+        'Teléfono':              ei.get('contacto', ''),
+        'Correo':                ei.get('correo', ''),
+        'Fecha último registro': fecha_diag or '',
+        'Estado':                estado,
+        'Completados':           total_done,
+        'Falta':                 '; '.join(missing) if missing else '',
     }
     for iname in instr_names:
         row[iname] = instr_status[iname]
@@ -269,18 +305,36 @@ for _, school in pulldata.iterrows():
 
 df_result = pd.DataFrame(rows)
 
-# ── Header + última actualización ─────────────────────────────────────────────
+# ── Título ─────────────────────────────────────────────────────────────────────
 st.title("🏫 Diagnóstico de Centros Educativos")
 
-last_update = get_last_update()
-if last_update:
-    st.markdown(f'<div class="update-box">🕐 <strong>Última actualización:</strong> {last_update} &nbsp;|&nbsp; <strong>{count_files_on_disk()}/10</strong> instrumentos cargados</div>', unsafe_allow_html=True)
+# ── Banner sincronización ──────────────────────────────────────────────────────
+last_fecha, last_archivos = get_last_sync()
+if last_fecha:
+    st.markdown(f"""
+    <div class="sync-banner">
+        <div class="title">🔄 Última sincronización: {last_fecha}</div>
+        <div class="note">
+            ⚠️ Los datos mostrados corresponden a la sincronización del <strong>{last_fecha}</strong>.<br>
+            Para ver información más reciente, sube los nuevos archivos CSV desde el panel izquierdo
+            y haz clic en <strong>"Guardar y actualizar reporte"</strong>.
+        </div>
+        {"<div class='files'>📁 Archivos subidos: " + last_archivos + "</div>" if last_archivos else ""}
+    </div>
+    """, unsafe_allow_html=True)
+else:
+    st.markdown("""
+    <div class="no-sync-banner">
+        ⚠️ <strong>Aún no se ha realizado ninguna sincronización.</strong><br>
+        Sube los archivos CSV desde el panel izquierdo para generar el reporte.
+    </div>
+    """, unsafe_allow_html=True)
 
 # ── Métricas ───────────────────────────────────────────────────────────────────
-total   = len(df_result)
-comp    = (df_result['Estado'] == 'Diagnóstico completo').sum()
-inc     = (df_result['Estado'] == 'Diagnóstico incompleto').sum()
-sin     = (df_result['Estado'] == 'Sin realizar').sum()
+total = len(df_result)
+comp  = (df_result['Estado'] == 'Diagnóstico completo').sum()
+inc   = (df_result['Estado'] == 'Diagnóstico incompleto').sum()
+sin   = (df_result['Estado'] == 'Sin realizar').sum()
 
 c1, c2, c3, c4 = st.columns(4)
 with c1:
@@ -298,7 +352,7 @@ st.markdown("<br>", unsafe_allow_html=True)
 f1, f2, f3 = st.columns([2, 2, 3])
 with f1:
     provincias = ["Todas"] + sorted(df_result['Regional/Provincia'].unique().tolist())
-    prov_sel = st.selectbox("Provincia", provincias)
+    prov_sel   = st.selectbox("Provincia", provincias)
 with f2:
     estado_sel = st.selectbox("Estado diagnóstico", ["Todos", "Diagnóstico completo", "Diagnóstico incompleto", "Sin realizar"])
 with f3:
@@ -319,24 +373,16 @@ if buscar:
 st.markdown(f"**{len(df_view)} centros educativos** encontrados")
 
 # ── Tabla ──────────────────────────────────────────────────────────────────────
-def badge_html(estado):
-    if estado == 'Diagnóstico completo':
-        return '✅ Completo'
-    elif estado == 'Sin realizar':
-        return '❌ Sin realizar'
+def badge(estado):
+    if estado == 'Diagnóstico completo': return '✅ Completo'
+    elif estado == 'Sin realizar':       return '❌ Sin realizar'
     return '⚠️ Incompleto'
 
 def progress_str(done):
-    filled = '🟢' * done + '⚪' * (10 - done)
-    return f"{filled} {done}/10"
+    return f"{'🟢' * done}{'⚪' * (total_instr - done)}  {done}/{total_instr}"
 
-display_df = df_view[[
-    'SIACE', 'Nombre CE', 'Regional/Provincia',
-    'Director/a', 'Teléfono', 'Fecha último registro',
-    'Estado', 'Completados', 'Falta'
-]].copy()
-
-display_df['Estado'] = display_df['Estado'].apply(badge_html)
+display_df = df_view[['SIACE','Nombre CE','Regional/Provincia','Director/a','Teléfono','Fecha último registro','Estado','Completados','Falta']].copy()
+display_df['Estado'] = display_df['Estado'].apply(badge)
 display_df['Avance'] = display_df['Completados'].apply(progress_str)
 display_df = display_df.drop(columns=['Completados'])
 
@@ -346,25 +392,56 @@ st.dataframe(
     hide_index=True,
     height=520,
     column_config={
-        'SIACE':                    st.column_config.TextColumn("SIACE", width=70),
-        'Nombre CE':                st.column_config.TextColumn("Centro Educativo", width=220),
-        'Regional/Provincia':       st.column_config.TextColumn("Provincia", width=120),
-        'Director/a':               st.column_config.TextColumn("Director/a", width=150),
-        'Teléfono':                 st.column_config.TextColumn("Teléfono", width=100),
-        'Fecha último registro':    st.column_config.TextColumn("Último reg.", width=100),
-        'Estado':                   st.column_config.TextColumn("Estado", width=130),
-        'Avance':                   st.column_config.TextColumn("Avance", width=180),
-        'Falta':                    st.column_config.TextColumn("Falta completar", width=300),
+        'SIACE':                 st.column_config.TextColumn("SIACE",            width=70),
+        'Nombre CE':             st.column_config.TextColumn("Centro Educativo", width=220),
+        'Regional/Provincia':    st.column_config.TextColumn("Provincia",        width=120),
+        'Director/a':            st.column_config.TextColumn("Director/a",       width=150),
+        'Teléfono':              st.column_config.TextColumn("Teléfono",         width=100),
+        'Fecha último registro': st.column_config.TextColumn("Último reg.",      width=100),
+        'Estado':                st.column_config.TextColumn("Estado",           width=130),
+        'Avance':                st.column_config.TextColumn("Avance",           width=160),
+        'Falta':                 st.column_config.TextColumn("Falta completar",  width=300),
     }
 )
 
-# ── Descarga CSV ───────────────────────────────────────────────────────────────
-st.markdown("---")
-csv_bytes = df_result.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
-st.download_button(
-    label="⬇️ Descargar reporte completo (CSV)",
-    data=csv_bytes,
-    file_name=f"reporte_diagnostico_{datetime.now().strftime('%Y%m%d')}.csv",
-    mime="text/csv",
-    use_container_width=False,
-)
+# ── Área de descarga ───────────────────────────────────────────────────────────
+st.markdown("""
+<div class="download-area">
+    <div class="download-title">⬇️ Descargar reporte</div>
+    <div class="download-note">
+        Descarga el reporte completo en formato CSV con todos los centros educativos,
+        estados de diagnóstico e instrumentos faltantes. Compatible con Excel y Google Sheets.
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+fecha_str = last_fecha.replace("/", "-").replace(" a las ", "_").replace(":", "") if last_fecha else datetime.now().strftime('%Y%m%d')
+
+col_a, col_b, col_c = st.columns([2, 2, 3])
+
+with col_a:
+    csv_completo = df_result.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
+    st.download_button(
+        label="📥 Reporte completo (todos los CEs)",
+        data=csv_completo,
+        file_name=f"reporte_completo_{fecha_str}.csv",
+        mime="text/csv",
+        use_container_width=True,
+    )
+
+with col_b:
+    df_filtrado = df_view[['SIACE','Nombre CE','Regional/Provincia','Director/a','Teléfono','Correo','Fecha último registro','Estado','Falta']].copy()
+    csv_filtrado = df_filtrado.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
+    st.download_button(
+        label="📥 Reporte filtrado (vista actual)",
+        data=csv_filtrado,
+        file_name=f"reporte_filtrado_{fecha_str}.csv",
+        mime="text/csv",
+        use_container_width=True,
+    )
+
+with col_c:
+    if last_fecha:
+        st.info(f"📅 Datos de la sincronización del **{last_fecha}**")
+    else:
+        st.warning("⚠️ No hay sincronización registrada aún.")
