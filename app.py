@@ -115,7 +115,6 @@ def count_files_on_disk():
 
 # ── Sidebar: carga de archivos ─────────────────────────────────────────────────
 with st.sidebar:
-    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/Camponotus_flavomarginatus_ant.svg/1200px-Camponotus_flavomarginatus_ant.svg.png", width=0)
     st.title("📂 Actualizar archivos")
     st.markdown("Sube los CSV exportados desde KoboToolbox. Los archivos se guardan y el reporte se actualiza automáticamente.")
 
